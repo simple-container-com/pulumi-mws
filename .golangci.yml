@@ -1,0 +1,68 @@
+# Copied from simple-container-com/pulumi-sbercloud with the module prefix swapped.
+#
+# ADVISORY, not gated: there is no lint workflow here (nor in pulumi-sbercloud),
+# and `golangci-lint run` cannot even load this config unless the binary itself
+# was built with go >= 1.27 — upstream terraform-provider-mws requires go 1.27 and
+# golangci-lint refuses a module targeting a newer Go than it was built with
+# ("the Go language version (go1.26) used to build golangci-lint is lower than the
+# targeted Go version (1.27)", measured 2026-11-06 against golangci-lint 2.12.2).
+# Until a go1.27-built release is at hand, the working preflight for the four
+# hand-written files is `gci write` with the sections below plus `gofmt -l`:
+#
+#   gci write --skip-generated --custom-order \
+#     -s standard -s blank -s default \
+#     -s "prefix(github.com/pulumi/)" \
+#     -s "prefix(github.com/simple-container-com/pulumi-mws)" \
+#     provider/resources.go provider/cmd/*/main.go provider/pkg/version/version.go
+#
+version: "2"
+linters:
+  enable:
+    - goconst
+    - gosec
+    - lll
+    - misspell
+    - nakedret
+    - revive
+    - unconvert
+  settings:
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - schema.go
+      - pulumiManifest.go
+      - pkg/vendored
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - blank
+        - default
+        - prefix(github.com/pulumi/)
+        - prefix(github.com/simple-container-com/pulumi-mws)
+      custom-order: true
+  exclusions:
+    generated: lax
+    paths:
+      - schema.go
+      - pulumiManifest.go
+      - pkg/vendored
+      - third_party$
+      - builtin$
+      - examples$

@@ -1,0 +1,6 @@
+{
+  "resource": true,
+  "name": "mws",
+  "version": "0.0.1-dev",
+  "server": "github://api.github.com/simple-container-com/pulumi-mws"
+}

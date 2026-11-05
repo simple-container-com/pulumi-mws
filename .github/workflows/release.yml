@@ -1,0 +1,134 @@
+name: release
+
+# Publishes the plugin binaries that the Pulumi engine downloads at deploy time.
+#
+# Because this repo is not under the `pulumi` GitHub org, the engine's github plugin
+# source resolves a plugin through
+#   https://api.github.com/repos/simple-container-com/pulumi-mws/releases/tags/v<VERSION>
+# and looks for an asset named exactly
+#   pulumi-resource-mws-v<VERSION>-<os>-<arch>.tar.gz
+# containing a binary named `pulumi-resource-mws` at the archive root. The asset
+# naming below is that contract — do not "tidy" it.
+#
+# The tag drives the version: `v0.1.0` must match the schema version baked into the
+# generated SDK (RespectSchemaVersion is on), so tag and the committed schema move
+# together.
+#
+# NOTE ON GO VERSION: upstream terraform-provider-mws requires go 1.27, and
+# `go-version-file: provider/go.mod` is what keeps that honest — setup-go pins
+# GOTOOLCHAIN=local, so hardcoding an older version here would fail the build
+# outright rather than silently downloading a toolchain.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, without the leading v (e.g. 0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # Retried, and a separate step from the build on purpose. All four matrix jobs
+      # share one setup-go cache key (provider/go.sum), so on the first run for a new
+      # go.sum they all miss and fetch this provider's very large dependency tree
+      # from proxy.golang.org simultaneously. On pulumi-sbercloud's v0.1.0 tag two of
+      # the four died on `stream error: ...; INTERNAL_ERROR; received from peer` — a
+      # transport flake, not a missing module, and one that failed the whole release
+      # because the publish job needs all four archives. Three attempts with a pause
+      # is enough: the module cache is additive, so each retry only re-fetches what
+      # the last one did not get.
+      - name: Download modules
+        working-directory: provider
+        run: |
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            echo "go mod download failed (attempt ${attempt}); retrying" >&2
+            sleep 15
+          done
+          exit 1
+
+      # GOMAXPROCS/GOMEMLIMIT/-p 1 are the pins pulumi-sbercloud needed: the embedded
+      # schema is ~1.8 MB of generated Go type information and the bridge pulls in
+      # both the SDKv2 and plugin-framework trees, which OOM-kills a 7 GB runner when
+      # the compiler is allowed to fan out.
+      - name: Build provider
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          GOMAXPROCS: "1"
+          GOMEMLIMIT: "6GiB"
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          mkdir -p dist
+          go build -C provider -p 1 \
+            -o "${GITHUB_WORKSPACE}/dist/pulumi-resource-mws" \
+            -ldflags "-s -w -X github.com/simple-container-com/pulumi-mws/provider/pkg/version.Version=${VERSION}" \
+            github.com/simple-container-com/pulumi-mws/provider/cmd/pulumi-resource-mws
+          tar -czf \
+            "dist/pulumi-resource-mws-v${VERSION}-${GOOS}-${GOARCH}.tar.gz" \
+            -C dist pulumi-resource-mws
+          rm dist/pulumi-resource-mws
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*.tar.gz
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Pulumi provider for MWS Cloud Platform (МТС Web Services), bridged from mws-cloud-platform/terraform-provider-mws. Go SDK: \`go get github.com/simple-container-com/pulumi-mws/sdk@${GITHUB_REF_NAME}\`" \
+            dist/*.tar.gz

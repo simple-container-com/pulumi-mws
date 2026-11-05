@@ -1,0 +1,51 @@
+{
+    "default-resource-schema-fixups": {
+        "resources": {
+            "mws_certmanager_certificate": {},
+            "mws_compute_disk": {},
+            "mws_compute_disk_backup": {},
+            "mws_compute_image": {},
+            "mws_compute_snapshot": {},
+            "mws_compute_virtual_machine": {},
+            "mws_gpt_deployment": {},
+            "mws_iam_api_key": {},
+            "mws_iam_authorized_key": {},
+            "mws_iam_hmac_key": {},
+            "mws_iam_service_account": {},
+            "mws_kms_crypto_key": {},
+            "mws_mclickhouse_backup": {},
+            "mws_mclickhouse_cluster": {},
+            "mws_metastore_iceberg": {},
+            "mws_metastore_iceberg_role_binding": {},
+            "mws_mk8s_cluster": {},
+            "mws_mk8s_node_group": {},
+            "mws_mkafka_cluster": {},
+            "mws_mkafka_cluster_user": {},
+            "mws_mkafka_topic": {},
+            "mws_mpostgres_backup": {},
+            "mws_mpostgres_cluster": {},
+            "mws_mpostgres_cluster_database": {},
+            "mws_mpostgres_cluster_user": {},
+            "mws_nlb_nlb": {},
+            "mws_queue_topic": {},
+            "mws_queue_topic_role_binding": {},
+            "mws_resmanager_enabled_service": {
+                "computeID": {
+                    "kind": "missing"
+                }
+            },
+            "mws_resmanager_project_role_binding": {},
+            "mws_secretmanager_secret": {},
+            "mws_secretmanager_secret_version": {},
+            "mws_vpc_address": {},
+            "mws_vpc_address_group": {},
+            "mws_vpc_egress_nat": {},
+            "mws_vpc_external_address": {},
+            "mws_vpc_firewall_rule": {},
+            "mws_vpc_network": {},
+            "mws_vpc_one_to_one_nat": {},
+            "mws_vpc_route": {},
+            "mws_vpc_subnet": {}
+        }
+    }
+}

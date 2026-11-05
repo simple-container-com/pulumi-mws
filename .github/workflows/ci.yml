@@ -1,0 +1,44 @@
+name: ci
+
+# Cheap gate: both modules must compile. It deliberately does NOT re-run tfgen —
+# regenerating the schema takes minutes and the committed schema.json is the
+# artifact under review, so a drift check here would only tell us what the diff
+# already shows. Regenerate by hand (see README) when bumping the upstream pin.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+
+      - name: Download modules
+        working-directory: provider
+        run: |
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            echo "go mod download failed (attempt ${attempt}); retrying" >&2
+            sleep 15
+          done
+          exit 1
+
+      - name: Build provider
+        working-directory: provider
+        env:
+          GOMAXPROCS: "1"
+          GOMEMLIMIT: "6GiB"
+        run: go build -p 1 ./...
+
+      - name: Build SDK
+        working-directory: sdk
+        run: go build ./...
