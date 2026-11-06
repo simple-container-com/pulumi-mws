@@ -85,6 +85,29 @@ made the SDK unconsumable by every SC repo (the fleet pins `GOTOOLCHAIN` via `se
 provider's constraint into the SDK, and do not raise it to match a newly-released toolchain
 unless the SDK genuinely needs it.
 
+## `sdk/go.mod` also pins `pulumi/pulumi/sdk/v3` DOWN to match `api`
+
+The generator emits its own current Pulumi SDK (`v3.274.1` as generated). **That version does
+not work with SC**, and the failure is a compile error inside `api`, not in anything MWS:
+
+```
+api/pkg/plugin/monitor_proxy.go:102: *MonitorProxy does not implement
+  pulumirpc.ResourceMonitorServer (wrong type for method Invoke)
+    have Invoke(ctx, *pulumirpc.ResourceInvokeRequest) (*pulumirpc.InvokeResponse, error)
+    want Invoke(ctx, *pulumirpc.ResourceInvokeRequest) (*pulumirpc.ResourceInvokeResponse, error)
+```
+
+Pulumi renamed `Invoke`'s response message between `v3.245.0` and `v3.274.1`, and
+`api`'s plugin-side resource-monitor proxy implements that gRPC server interface. Because Go
+picks the **maximum** required version, a single plugin requiring this SDK at `v3.274.1` drags
+every `sc-plugin-*` module's `api` past the break — so the pin has to be lowered **here**, in
+the SDK, not worked around with a `replace` in each consumer.
+
+So `sdk/go.mod` requires `github.com/pulumi/pulumi/sdk/v3 v3.245.0`, matching `api/go.mod`.
+The generated SDK compiles against it unchanged (measured 2026-11-06). **Re-lower it after
+every regeneration, and when `api` bumps its Pulumi SDK, bump this to the same version** —
+the two must move together.
+
 ## Build
 
 ```bash
