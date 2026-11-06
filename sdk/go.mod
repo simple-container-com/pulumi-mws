@@ -1,6 +1,6 @@
 module github.com/simple-container-com/pulumi-mws/sdk
 
-go 1.27
+go 1.26.10
 
 require (
 	github.com/blang/semver v3.5.1+incompatible

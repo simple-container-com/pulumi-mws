@@ -71,8 +71,19 @@ cd provider && go get go.mws.cloud/terraform-provider-mws@$SHA
 The module path is the vanity `go.mws.cloud/terraform-provider-mws`, which serves `go-import`
 meta pointing back at GitHub.
 
-Upstream also requires **Go 1.27**, so a box with `GOTOOLCHAIN=local` on an older Go cannot
-build this repo at all.
+Upstream also requires **Go 1.27**, which is inherited by `provider/go.mod` — so a box with
+`GOTOOLCHAIN=local` on an older Go cannot build the **provider** module (the tfgen and
+`pulumi-resource-mws` binaries) at all.
+
+**`sdk/go.mod` deliberately declares `go 1.26.10`, not 1.27.** The generator emits its own
+current toolchain version into both modules, but the SDK needs nothing from 1.27 — its only
+direct dependency, `pulumi/pulumi/sdk/v3 v3.274.1`, declares `go 1.26.6`. The gratuitous 1.27
+made the SDK unconsumable by every SC repo (the fleet pins `GOTOOLCHAIN` via `setup-go`, and
+`sc-plugin-mws` is on `go 1.26.10`): `go build` fails with
+`go.mod requires go >= 1.27 (running go 1.26.10; GOTOOLCHAIN=local)` before it compiles a line.
+**After every `tfgen go` regeneration, re-lower `sdk/go.mod`** — do not propagate the
+provider's constraint into the SDK, and do not raise it to match a newly-released toolchain
+unless the SDK genuinely needs it.
 
 ## Build
 
