@@ -40,8 +40,19 @@ all: schema sdk provider
 #    `//go:embed schema.json`, and that file does not exist until step 2 — so
 #    `go build ./...` on a clean tree fails with "pattern schema.json: no
 #    matching files found" before tfgen ever gets a chance to produce it.
+#
+#    STAMPED with the same LDFLAGS as the provider, and that is load-bearing
+#    rather than symmetry for its own sake: tfgen reads `version.Version` from
+#    ITS OWN binary to fill the schema's `version`, and the generated Go SDK
+#    hard-codes that value into `PkgResourceDefaultOpts` as
+#    `pulumi.Version(...)`. An unstamped tfgen therefore bakes the dev default
+#    into every resource the SDK creates, so the engine goes looking for
+#    `pulumi-resource-mws` v0.0.1-dev no matter what tag was actually released —
+#    which is exactly what the first SDK generation did (2026-11-06), and why
+#    the committed schema had no `version` field at all.
 tfgen:
-	cd provider && go build -o $(CURDIR)/provider/$(CODEGEN) ./cmd/$(CODEGEN)
+	cd provider && go build -o $(CURDIR)/provider/$(CODEGEN) \
+		-ldflags "$(LDFLAGS)" ./cmd/$(CODEGEN)
 
 # 2. The Pulumi schema, committed (1.8 MB). Must run from the repo root: tfgen
 #    writes relative to the working directory.
